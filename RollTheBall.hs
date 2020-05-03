@@ -335,8 +335,40 @@ wonLevel lvl@(L board)= (dfs (start_point 0 0 (snd (A.bounds board)) lvl)
                && (connection (C (board A.! start)) (C (board A.! ((fst start), (snd start - 1)))) West) =  dfs ((fst start), (snd start - 1)) start finish lv
             | otherwise = False
 
-
+genMove :: Position -> Directions -> Level -> [((Position, Directions), Level)]
+genMove pos North lvl@(L board) = if (checkEmptySpace ((fst pos) - 1, (snd pos)) lvl) && (checkStart pos lvl) 
+                                   then [((pos, North), (addCell (emptySpace, pos) (addCell ((board A.! pos), ((fst pos) - 1, (snd pos))) lvl)))]
+                                   else []
+genMove pos South lvl@(L board) = if (checkEmptySpace ((fst pos) + 1, (snd pos)) lvl) && (checkStart pos lvl) 
+                                   then [((pos, South), (addCell (emptySpace, pos) (addCell ((board A.! pos), ((fst pos) + 1, (snd pos))) lvl)))]
+                                   else []
+genMove pos East lvl@(L board) = if (checkEmptySpace ((fst pos), (snd pos) + 1) lvl) && (checkStart pos lvl) 
+                                   then [((pos, East), (addCell (emptySpace, pos) (addCell ((board A.! pos), ((fst pos), (snd pos) + 1)) lvl)))]
+                                   else []
+genMove pos West lvl@(L board) = if (checkEmptySpace ((fst pos), (snd pos) - 1) lvl) && (checkStart pos lvl) 
+                                   then [((pos, West), (addCell (emptySpace, pos) (addCell ((board A.! pos), ((fst pos), (snd pos) - 1)) lvl)))]
+                                   else []
 instance ProblemState Level (Position, Directions) where
-    successors = undefined
-    isGoal = undefined
-    reverseAction = undefined
+    successors lvl @(L board) = generate 0 0 (snd (A.bounds board)) lvl
+        where
+            generate line col right_bottom l@(L board2)
+                | (line == (fst right_bottom) + 1) = []
+                | (not (elem (board2 A.! (line, col)) startChars))
+                  && (not (elem (board2 A.! (line, col)) winChars))
+                  && ((board2 A.! (line, col)) /= emptySpace) = (genMove (line, col) North lvl) ++ 
+                                                                         (genMove (line, col) South lvl) ++ 
+                                                                         (genMove (line, col) East lvl) ++ 
+                                                                         (genMove (line, col) West lvl) ++ 
+                                                                         if col == (snd right_bottom) 
+                                                                            then generate (line + 1) 0 right_bottom l
+                                                                            else generate line (col + 1) right_bottom l
+                | otherwise = if col == (snd right_bottom) 
+                                then generate (line + 1) 0 right_bottom l
+                                else generate line (col + 1) right_bottom l
+
+    isGoal lvl@(L board) = wonLevel lvl
+    reverseAction state
+        | (snd (fst state)) == North = ((((fst (fst (fst state))) - 1, (snd (fst (fst state)))), South), (moveCell (fst (fst state)) North (snd state)))
+        | (snd (fst state)) == South = ((((fst (fst (fst state))) + 1, (snd (fst (fst state)))), North), (moveCell (fst (fst state)) South (snd state)))
+        | (snd (fst state)) == East = ((((fst (fst (fst state))), (snd (fst (fst state))) + 1), West), (moveCell (fst (fst state)) East (snd state)))
+        | otherwise = ((((fst (fst (fst state))), (snd (fst (fst state))) - 1), East), (moveCell (fst (fst state)) West (snd state)))
