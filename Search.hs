@@ -4,6 +4,8 @@
 module Search where
 
 import ProblemState
+import Data.Maybe
+
 {-
     *** TODO ***
 
@@ -92,19 +94,20 @@ bfs node = getKids [node] []
 -}
 
 bidirBFS :: Ord s => Node s a -> Node s a -> (Node s a, Node s a)
-bidirBFS start finish = ((getNodeSt (bfs start) (bfs finish)) , (getNodeFin (bfs start) (bfs finish)))
+bidirBFS start finish = (getCommonNode  (fst $ fst $ head $ take 1 $ [x | x <- flux, (checkCommon (fst (fst x)) (snd (snd x)))] ++ [x | x <- flux, (checkCommon (fst (snd x)) (snd (fst x)))])
+                                        (snd $ snd $ head $ take 1 $ [x | x <- flux, (checkCommon (fst (fst x)) (snd (snd x)))] ++ [x | x <- flux, (checkCommon (fst (snd x)) (snd (fst x)))]))
     where
-        getNodeSt (elem1:stlist) (elem2:fnlist) = if null [a | a <- (fst elem1), b <- (snd elem2), (checkLevel a b)] 
-                                                 then (getNodeSt stlist fnlist)
-                                                 else (head [a | a <- (fst elem1), b <- (snd elem2), (checkLevel a b)])
+        checkCommon elem1 elem2 = if null [a | a <- elem1, b <- elem2, (checkLevel a b)] then False else True
             where
-               checkLevel lv1 lv2 = if (nodeState lv1 == nodeState lv2) then True else False
+                checkLevel lv1 lv2 = if (nodeState lv1 == nodeState lv2) then True else False
 
-        getNodeFin (elem1:stlist) (elem2:fnlist) = if null [b | a <- (fst elem1), b <- (snd elem2), (checkLevel a b)] 
-                                                 then (getNodeFin stlist fnlist)
-                                                 else (head [b | a <- (fst elem1), b <- (snd elem2), (checkLevel a b)])
+        getCommonNode list1 list2 = ((head [a | a <- list1, b <- list2, (checkNode a b)]), (head [b | a <- list1, b <- list2, (checkNode a b)]))
             where
-               checkLevel lv1 lv2 = if (nodeState lv1 == nodeState lv2) then True else False
+                checkNode node1 node2 = nodeState node1 == nodeState node2
+
+        flux = zip (bfs start) (bfs finish)
+
+
 {-
     *** TODO ***
 
@@ -112,12 +115,16 @@ bidirBFS start finish = ((getNodeSt (bfs start) (bfs finish)) , (getNodeFin (bfs
     către părinți.
 
     Întoarce o listă de perechi (acțiune, stare), care pornește de la starea inițială
-    și se încheie în starea finală.
+    și se încheie în starea finală. 
 
 -}
 
 extractPath :: Node s a -> [(Maybe a, s)]
-extractPath = undefined
+extractPath node = reverse path
+  where
+    parents (N _ _ _  0 _) = []
+    parents nd = (fromJust (nodeParent nd)) : (parents (fromJust (nodeParent nd))) 
+    path = map (\ x -> ((nodeAction x), (nodeState x))) ([node] ++ (parents node))
 
 
 
@@ -130,7 +137,7 @@ extractPath = undefined
     Atenție: Pentru calea gasită în a doua parcurgere, trebuie să aveți grijă la a asocia
     corect fiecare stare cu acțiunea care a generat-o.
 
-    Întoarce o listă de perechi (acțiune, stare), care pornește de la starea inițială
+    Întoarce o listă de perechi (acțiune, sfinishBfstare), care pornește de la starea inițială
     și se încheie în starea finală.
 -}
 
@@ -138,4 +145,17 @@ solve :: (ProblemState s a, Ord s)
       => s          -- Starea inițială de la care se pornește
       -> s          -- Starea finală la care se ajunge
       -> [(Maybe a, s)]   -- Lista perechilor
-solve = undefined
+solve start finish = startPath ++ (addMaybe (reversePath finishPath))
+    where
+        addMaybe [] = []
+        addMaybe (path : paths) = ((Just (fst path)), (snd path)) : (addMaybe paths)
+        reversePath [] = []
+        reversePath (path:paths) = (reverseAction ((fromJust (fst path)), (snd path))) : (reversePath paths)
+
+        startState = createStateSpace start
+        finishState = createStateSpace finish
+        middlePoint = bidirBFS startState finishState
+        startMiddlePoint = fst middlePoint
+        finishMiddlePoint = snd middlePoint
+        startPath = extractPath startMiddlePoint
+        finishPath = reverse $ tail $ extractPath finishMiddlePoint
